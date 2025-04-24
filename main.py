@@ -5,19 +5,35 @@ import xml.etree.ElementTree as ET
 import time
 import json as JSON
 from collections import Counter
+import altair as alt
+
+todasMecanicas = []
+todasCategorias = []
+
+def plot_frequencia(titulo, contagem):
+    df = pd.DataFrame(contagem[:10], columns=["Nome", "Frequência"])  # Top 10
+    chart = alt.Chart(df).mark_bar().encode(
+        x=alt.X("Frequência:Q"),
+        y=alt.Y("Nome:N", sort='-x'),
+        tooltip=["Nome", "Frequência"]
+    ).properties(
+        width=600,
+        height=400,
+        title=titulo
+    )
+    return chart
 
 def contarMecanicasCategorias(jogos_ids):
-    todas_mecanicas = []
-    todas_categorias = []
-
+    
     for game_id in jogos_ids:
         info = fetch_game_mechanics_and_categories(game_id["id"])
-        todas_mecanicas.extend(info["mechanics"])
-        todas_categorias.extend(info["categories"])
-        time.sleep(3)  # evitar overload na API
+        #print(info)
+        #todas_mecanicas.extend(info["mechanics"])
+        #todas_categorias.extend(info["categories"])
+        time.sleep(1)  # evitar overload na API
 
-    contagem_mec = Counter(todas_mecanicas)
-    contagem_cat = Counter(todas_categorias)
+    contagem_mec = Counter(todasMecanicas)
+    contagem_cat = Counter(todasCategorias)
 
     return contagem_mec.most_common(), contagem_cat.most_common()
 
@@ -27,17 +43,15 @@ def fetch_game_mechanics_and_categories(paramGameId):
     
     if response.status_code == 200:
         root = ET.fromstring(response.content)
-        metadadosJogo = []
-        print(root)
         for link in root.findall(".//link"):
-            metadadosJogo.append('a')
-            if link.attrib["type"] == "boardgamecategory" and link.attrib["value"] =='baordgamemechanics':
-                metadadosJogo.append('b')
-                metadadosJogo.append(link.attrib["value"])
-        print("Mecanicas: ", metadadosJogo)
-        return metadadosJogo
+            if link.attrib["type"] == "boardgamecategory":
+               todasCategorias.append(link.attrib["value"]) 
+            if link.attrib["type"] =='boardgamemechanic':
+                todasMecanicas.append(link.attrib["value"])
+        
+        return todasMecanicas, todasCategorias
     else:
-        return []
+        return [], []
 
 def fetch_price_USD(paramGameId):
     uri = f"https://boardgamegeek.com/api/market/products/pricehistory?ajax=1&condition=any&currency=USD&objectid={paramGameId}&objecttype=thing&pageid=1"
@@ -111,7 +125,7 @@ st.title("Quanto vale minha coleção de Boardgames?")
 username = st.text_input("Digite seu nome de usuário do BoardGameGeek")
 
 if st.button("Buscar coleção") and username:
-    with st.spinner("Consultando a coleção..."):
+    with st.spinner("Analisando a coleção...Se você achar que está demorando, venda alguns jogos!"):
         collection = fetch_collection(username)
         priceTotal = 0
         maxPriceTotal = 0
@@ -143,14 +157,22 @@ if st.button("Buscar coleção") and username:
                 st.dataframe(df, use_container_width=True, hide_index=True)
             st.toast("No detalhamento da coleção, há opção de Exportar para CSV. Pode ser importado no Excel, para você usar mais funções.", icon="🔔")
 
+            col1, col2 = st.columns(2)
             #Futuramente Apresentar um gráfico com as mecanicas
-            #mec_top, cat_top = contarMecanicasCategorias(collection)
-            #st.subheader("🧩 Mecânicas mais frequentes")
-            #for mec, count in mec_top[:10]:
-            #    st.write(f"{mec}: {count} jogos")
+            mec_top, cat_top = contarMecanicasCategorias(collection)
+            with col1:  
+                st.subheader("🧩 Mecânicas mais frequentes")
+                for mec, count in mec_top[:10]:
+                    st.write(f"{mec}: {count} jogos")
+                st.altair_chart(plot_frequencia("🧩 Mecânicas mais presentes", mec_top))
+            with col2:
+                st.subheader("🏷️ Categorias mais frequentes")
+                for cat, count in cat_top[:10]:
+                    st.write(f"{cat}: {count} jogos")
+                st.altair_chart(plot_frequencia("🏷️ Categorias mais presentes", cat_top))
 
-            #st.subheader("🏷️ Categorias mais frequentes")
-            #for cat, count in cat_top[:10]:
-            #    st.write(f"{cat}: {count} jogos")
+            #Sugestão - Aqui que é o PUNK                   
+            st.subheader("Sugestões de jogos semelhantes")  
+            st.write("Em breve!")
         else:
             st.warning("Nenhum jogo encontrado ou usuário inválido.")
