@@ -95,18 +95,6 @@ if st.button("Buscar coleção") and username:
             with st.expander("Ver Detalhes da coleção"):
                 st.write("A coleção foi estimada com base no preço da última venda realizada no BGG Market, independente da condição do jogo.")
                 st.dataframe(newdata, use_container_width=True, hide_index=True)
-
-            # Exportar para Excel
-            if st.button("Exportar coleção para Excel"):
-                output = io.BytesIO()
-                with pd.ExcelWriter(output, engine="openpyxl") as XLwriter:
-                    df.to_excel(XLwriter, index=False, sheet_name="Coleção")
-                    XLwriter.save()
-                st.download_button(
-                    label="📥 Baixar coleção como Excel",
-                    data=output.getvalue(),
-                    file_name="colecao_bgg.xlsx",
-                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                )
+            st.toast("No detalhamento da coleção, há opção de Exportar para CSV. Pode ser importado no Excel, para você usar mais funções.", icon="🔔")
         else:
             st.warning("Nenhum jogo encontrado ou usuário inválido.")
