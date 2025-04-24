@@ -4,7 +4,6 @@ import requests
 import xml.etree.ElementTree as ET
 import time
 import json as JSON
-import io
 
 def fetch_price_USD(paramGameId):
     uri = f"https://boardgamegeek.com/api/market/products/pricehistory?ajax=1&condition=any&currency=USD&objectid={paramGameId}&objecttype=thing&pageid=1"
@@ -91,10 +90,11 @@ if st.button("Buscar coleção") and username:
             st.success(f"Coleção estimada em USD$ {priceTotal:.2f}")       
             
             df = pd.DataFrame(data)
-            newdata = df.astype(str)
+            df.round(decimals=2)
+            df['price'] = df['price'].astype(float)
             with st.expander("Ver Detalhes da coleção"):
                 st.write("A coleção foi estimada com base no preço da última venda realizada no BGG Market, independente da condição do jogo.")
-                st.dataframe(newdata, use_container_width=True, hide_index=True)
+                st.dataframe(df, use_container_width=True, hide_index=True)
             st.toast("No detalhamento da coleção, há opção de Exportar para CSV. Pode ser importado no Excel, para você usar mais funções.", icon="🔔")
         else:
             st.warning("Nenhum jogo encontrado ou usuário inválido.")
