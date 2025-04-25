@@ -172,7 +172,7 @@ if st.button("Buscar coleção") and username:
                 st.altair_chart(plot_frequencia("🏷️ Categorias mais presentes", cat_top))
 
             #Sugestão - Aqui que é o PUNK                   
-            st.subheader("Sugestões de jogos semelhantes")  
+            st.subheader("Sugestões de jogos semelhantes.")  
             st.write("Em breve!")
         else:
             st.warning("Nenhum jogo encontrado ou usuário inválido.")
