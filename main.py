@@ -7,8 +7,11 @@ import json as JSON
 from collections import Counter
 import altair as alt
 
+collection = []
 todasMecanicas = []
 todasCategorias = []
+todosDesigners = []
+#breveArtistas
 
 def plot_frequencia(titulo, contagem):
     df = pd.DataFrame(contagem[:10], columns=["Nome", "Frequência"])  # Top 10
@@ -34,11 +37,12 @@ def contarMecanicasCategorias(jogos_ids):
 
     contagem_mec = Counter(todasMecanicas)
     contagem_cat = Counter(todasCategorias)
+    contagem_aut = Counter(todosDesigners)
 
-    return contagem_mec.most_common(), contagem_cat.most_common()
+    return contagem_mec.most_common(), contagem_cat.most_common(), contagem_aut.most_common()
 
 def fetch_game_mechanics_and_categories(paramGameId):
-    url = f"https://boardgamegeek.com/xmlapi2/thing?id={paramGameId}&type=boardgame&stats=0"
+    url = f"https://boardgamegeek.com/xmlapi2/thing?id={paramGameId}&type=boardgame&stats=1"
     response = requests.get(url)
     
     if response.status_code == 200:
@@ -48,10 +52,12 @@ def fetch_game_mechanics_and_categories(paramGameId):
                todasCategorias.append(link.attrib["value"]) 
             if link.attrib["type"] =='boardgamemechanic':
                 todasMecanicas.append(link.attrib["value"])
+            if link.attrib["type"] =='boardgamedesigner':
+                todosDesigners.append(link.attrib["value"])
         
-        return todasMecanicas, todasCategorias
+        return todasMecanicas, todasCategorias, todosDesigners
     else:
-        return [], []
+        return [], [], []
 
 def fetch_price_USD(paramGameId):
     uri = f"https://boardgamegeek.com/api/market/products/pricehistory?ajax=1&condition=any&currency=USD&objectid={paramGameId}&objecttype=thing&pageid=1"
@@ -118,6 +124,12 @@ def fetch_collection(username):
     return games
 
 #====== Streamlit App ======#
+hide_github_icon = """
+#GithubIcon {
+  visibility: hidden;
+}
+"""
+#st.markdown(hide_github_icon, unsafe_allow_html=True)
 st.set_page_config(page_title="Vale Ouro", layout="wide")
 
 st.title("Quanto vale minha coleção de Boardgames?")
@@ -125,7 +137,7 @@ st.title("Quanto vale minha coleção de Boardgames?")
 username = st.text_input("Digite seu nome de usuário do BoardGameGeek")
 
 if st.button("Buscar coleção") and username:
-    with st.spinner("Analisando a coleção...Se você achar que está demorando, venda alguns jogos!"):
+    with st.spinner("Consultando coleção no BGG...Se você achar que está demorando, venda alguns jogos!"):
         collection = fetch_collection(username)
         priceTotal = 0
         maxPriceTotal = 0
@@ -156,23 +168,31 @@ if st.button("Buscar coleção") and username:
                 st.write("A coleção foi estimada com base no preço da última venda realizada no BGG Market, independente da condição do jogo.")
                 st.dataframe(df, use_container_width=True, hide_index=True)
             st.toast("No detalhamento da coleção, há opção de Exportar para CSV. Pode ser importado no Excel, para você usar mais funções.", icon="🔔")
-
-            col1, col2 = st.columns(2)
-            #Futuramente Apresentar um gráfico com as mecanicas
-            mec_top, cat_top = contarMecanicasCategorias(collection)
-            with col1:  
-                st.subheader("🧩 Mecânicas mais frequentes")
-                for mec, count in mec_top[:10]:
-                    st.write(f"{mec}: {count} jogos")
-                st.altair_chart(plot_frequencia("🧩 Mecânicas mais presentes", mec_top))
-            with col2:
-                st.subheader("🏷️ Categorias mais frequentes")
-                for cat, count in cat_top[:10]:
-                    st.write(f"{cat}: {count} jogos")
-                st.altair_chart(plot_frequencia("🏷️ Categorias mais presentes", cat_top))
-
-            #Sugestão - Aqui que é o PUNK                   
-            st.subheader("Sugestões de jogos semelhantes.")  
-            st.write("Em breve!")
         else:
             st.warning("Nenhum jogo encontrado ou usuário inválido.")
+
+    with st.spinner("Analisando a coleção..."):
+        col1, col2, col3 = st.columns(3)
+        #Futuramente Apresentar um gráfico com as mecanicas
+        mec_top, cat_top, aut_top = contarMecanicasCategorias(collection)
+        with col1:  
+            st.subheader("🧩 Mecânicas mais frequentes")
+            for mec, count in mec_top[:10]:
+                st.write(f"{mec}: {count} jogos")
+            st.altair_chart(plot_frequencia("🧩 Mecânicas mais presentes", mec_top))
+        with col2:
+            st.subheader("🏷️ Categorias mais frequentes")
+            for cat, count in cat_top[:10]:
+                st.write(f"{cat}: {count} jogos")
+            st.altair_chart(plot_frequencia("🏷️ Categorias mais presentes", cat_top))
+        with col3:
+            st.subheader("🏷️ Autores mais frequentes")
+            for aut, count in aut_top[:10]:
+                st.write(f"{aut}: {count} jogos")
+            st.altair_chart(plot_frequencia("🏷️ Designers mais presentes", aut_top))
+
+    #Sugestão - Aqui que é o PUNK              
+    # with st.spinner("Pensando em sugestões..."):
+    st.subheader("Sugestões de jogos semelhantes.")  
+    st.write("Em breve!")
+        
