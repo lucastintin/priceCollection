@@ -125,10 +125,13 @@ def fetch_collection(username):
 
 #====== Streamlit App ======#
 hide_github_icon = """
-#GithubIcon {
-  visibility: hidden;
-}
+<style>
+    .stApp [data-testid="stToolbar"] {
+        display: none;
+    }
+</style>
 """
+
 st.markdown(hide_github_icon, unsafe_allow_html=True)
 st.set_page_config(page_title="Vale Ouro", layout="wide")
 
