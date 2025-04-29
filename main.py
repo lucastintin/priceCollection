@@ -129,7 +129,7 @@ hide_github_icon = """
   visibility: hidden;
 }
 """
-#st.markdown(hide_github_icon, unsafe_allow_html=True)
+st.markdown(hide_github_icon, unsafe_allow_html=True)
 st.set_page_config(page_title="Vale Ouro", layout="wide")
 
 st.title("Quanto vale minha coleção de Boardgames?")
