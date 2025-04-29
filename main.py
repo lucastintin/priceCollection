@@ -13,6 +13,73 @@ todasCategorias = []
 todosDesigners = []
 #breveArtistas
 
+def gerar_html(jogos):
+    html = """
+    <html>
+    <head>
+        <style>
+            body {
+                font-family: Arial, sans-serif;
+                margin: 40px;
+            }
+            .jogo {
+                margin-bottom: 50px;
+                border-bottom: 2px solid #ddd;
+                padding-bottom: 30px;
+            }
+            img {
+                width: 100%;
+                max-height: 300px;
+                object-fit: cover;
+                border-radius: 8px;
+            }
+            .info {
+                display: flex;
+                justify-content: space-between;
+                margin-top: 20px;
+            }
+            .col {
+                width: 48%;
+            }
+            .rating {
+                background: #f0f0f0;
+                padding: 10px;
+                border-radius: 6px;
+                margin-bottom: 10px;
+                font-size: 1.2em;
+            }
+        </style>
+    </head>
+    <body>
+    """
+
+    for jogo in jogos:
+        html += f"""
+        <div class="jogo">
+            <img src={jogo['image']} />
+            <h1>{jogo['name']}</h1>
+            <div class="info">
+                <div class="col">
+                    <p><strong>Published:</strong> {jogo['yearpublished']}</p>
+                    <p><strong>Publisher:</strong> {jogo['publisher']}</p>
+                    <p><strong>Designer:</strong> {jogo['designer']}</p>
+                    <p><strong>Artist:</strong> {jogo['artist']}</p>
+                    <p><strong>Theme:</strong> {jogo['tema']}</p>
+                    <p><strong>Mechanic:</strong> {jogo['mecanica']}</p>
+                    <p><strong>Players:</strong> {jogo['jogadores']}</p>
+                    <p><strong>Duration:</strong> {jogo['duracao']} min</p>
+                </div>
+                <div class="col">
+                    <div class="rating"><strong>Rating:</strong> {jogo['rating']}</div>
+                    <div class="rating"><strong>Difficulty:</strong> {jogo['dificuldade']}</div>
+                </div>
+            </div>
+        </div>
+        """
+
+    html += "</body></html>"
+    return html
+
 def plot_frequencia(titulo, contagem):
     df = pd.DataFrame(contagem[:10], columns=["Nome", "Frequência"])  # Top 10
     chart = alt.Chart(df).mark_bar().encode(
@@ -103,7 +170,7 @@ def fetch_lastPrice_USD(paramGameId):
     return prices[0]['price']
 
 def fetch_collection(username):
-    url = f"https://boardgamegeek.com/xmlapi2/collection?username={username}&own=1"
+    url = f"https://boardgamegeek.com/xmlapi2/collection?username={username}&own=1&stats=1 "
     response = requests.get(url)
 
     # Espera até a API processar (BGG tem delay)
@@ -120,7 +187,17 @@ def fetch_collection(username):
             year_elem = item.find("yearpublished")
             year = year_elem.text if year_elem is not None else "?"
             price = fetch_price_USD(game_id)[0]['price']
-            games.append({"id": game_id, "name": name, "year": year, "price": price})
+
+            numplays = item.find("numplays").text
+            image = item.find("image").text if item.find("image") is not None else None
+            stats = {
+                "vendidos": item.find("stats").attrib["numowned"] if item.find("stats") is not None else 0,
+                "minplayers": item.find("stats").attrib["minplayers"] if item.find("stats") is not None else 0,
+                "maxplayers": item.find("stats").attrib["maxplayers"] if item.find("stats") is not None else 0,
+                "minplaytime": item.find("stats").attrib["minplaytime"] if item.find("stats") is not None else 0,
+                "maxplaytime": item.find("stats").attrib["maxplaytime"] if item.find("stats") is not None else 0,
+            }
+            games.append({"id": game_id, "name": name, "year": year, "price": price, "image": image, "numplays":numplays, "stats": stats })
     return games
 
 #====== Streamlit App ======#
@@ -140,62 +217,78 @@ st.title("Quanto vale minha coleção de Boardgames?")
 username = st.text_input("Digite seu nome de usuário do BoardGameGeek")
 
 if st.button("Buscar coleção") and username:
+    tab1, tab2, tab3 = st.tabs(["Valores", "Análise", "Sugestões"])
     with st.spinner("Consultando coleção no BGG...Se você achar que está demorando, venda alguns jogos!"):
         collection = fetch_collection(username)
         priceTotal = 0
         maxPriceTotal = 0
         minPriceTotal = 0
         data  = []
+        porJogas = sorted(collection, key=lambda jogo: int(jogo['numplays']))
+    with tab1:
+       st.warning(f"{len(collection)} jogos encontrados!")
+       with st.spinner("Calculando valores no mercado..."):
         if collection:
-            st.warning(f"{len(collection)} jogos encontrados!")
-            #st.write(collection)
-            for index, game in enumerate(collection):
+                #st.write(collection)
+                for index, game in enumerate(collection):
 
-                precos = fetch_price_USD(game["id"])
+                    precos = fetch_price_USD(game["id"])
+                    
+                    maxPrice = max(precos, key=lambda x: x['price'])['price']
+                    minPrice = min(precos, key=lambda x: x['price'])['price']
+
+                    maxPriceTotal += float(maxPrice)
+                    minPriceTotal += float(minPrice)
+
+                    priceTotal += float(game['price'])
+                    #Montando o dataFrame
+                    data.append({"name": game["name"], "last_sell": game['price'], 'min_price': minPrice, 'max_price': maxPrice})
+                st.success(f"Coleção estimada entre (em USD$): {minPriceTotal:.2f} ~ {maxPriceTotal:.2f}")       
                 
-                maxPrice = max(precos, key=lambda x: x['price'])['price']
-                minPrice = min(precos, key=lambda x: x['price'])['price']
-
-                maxPriceTotal += float(maxPrice)
-                minPriceTotal += float(minPrice)
-
-                priceTotal += float(game['price'])
-                #Montando o dataFrame
-                data.append({"name": game["name"], "last_sell": game['price'], 'min_price': minPrice, 'max_price': maxPrice})
-            st.success(f"Coleção estimada entre (em USD$): {minPriceTotal:.2f} ~ {maxPriceTotal:.2f}")       
-            
-            df = pd.DataFrame(data)
-            df.round(decimals=2)
-            df['last_sell'] = df['last_sell'].astype(float)
-            with st.expander("Ver Detalhes da coleção"):
-                st.write("A coleção foi estimada com base no preço da última venda realizada no BGG Market, independente da condição do jogo.")
-                st.dataframe(df, use_container_width=True, hide_index=True)
-            st.toast("No detalhamento da coleção, há opção de Exportar para CSV. Pode ser importado no Excel, para você usar mais funções.", icon="🔔")
+                df = pd.DataFrame(data)
+                df.round(decimals=2)
+                df['last_sell'] = df['last_sell'].astype(float)
+                with st.expander("Ver Detalhes de valores da coleção"):
+                    st.write("A coleção foi estimada com base no preço da última venda realizada no BGG Market, independente da condição do jogo.")
+                    st.dataframe(df, use_container_width=True, hide_index=True)
+                st.toast("No detalhamento da coleção, há opção de Exportar para CSV. Pode ser importado no Excel, para você usar mais funções.", icon="🔔")
         else:
             st.warning("Nenhum jogo encontrado ou usuário inválido.")
 
-    with st.spinner("Analisando a coleção..."):
-        col1, col2, col3 = st.columns(3)
-        #Futuramente Apresentar um gráfico com as mecanicas
-        mec_top, cat_top, aut_top = contarMecanicasCategorias(collection)
-        with col1:  
-            st.subheader("🧩 Mecânicas mais frequentes")
-            for mec, count in mec_top[:10]:
-                st.write(f"{mec}: {count} jogos")
-            st.altair_chart(plot_frequencia("🧩 Mecânicas mais presentes", mec_top))
-        with col2:
-            st.subheader("🏷️ Categorias mais frequentes")
-            for cat, count in cat_top[:10]:
-                st.write(f"{cat}: {count} jogos")
-            st.altair_chart(plot_frequencia("🏷️ Categorias mais presentes", cat_top))
-        with col3:
-            st.subheader("🏷️ Autores mais frequentes")
-            for aut, count in aut_top[:10]:
-                st.write(f"{aut}: {count} jogos")
-            st.altair_chart(plot_frequencia("🏷️ Designers mais presentes", aut_top))
+    with tab2:
+        with st.spinner("Analisando a coleção..."):            
+            kol1, kol2 = st.columns(2)
+            with kol1:
+                st.subheader("Mais jogados:")
+                #st.image(porJogas[-1]['image'], width=200)
+                st.write(f"{porJogas[-1]['name']} jogado {porJogas[-1]['numplays']} vezes")
+
+            with kol2: 
+                st.subheader("Menos jogado:")
+                #st.image(porJogas[0]['image'], width=200)
+                st.write(f"{porJogas[0]['name']} jogado {porJogas[0]['numplays']} vezes")
+
+            col1, col2, col3 = st.columns(3)
+            #Futuramente Apresentar um gráfico com as mecanicas
+            mec_top, cat_top, aut_top = contarMecanicasCategorias(collection)
+            with col1:  
+                st.subheader("🧩 Mecânicas mais frequentes")
+                for mec, count in mec_top[:10]:
+                    st.write(f"{mec}: {count} jogos")
+                st.altair_chart(plot_frequencia("🧩 Mecânicas mais presentes", mec_top))
+            with col2:
+                st.subheader("🏷️ Categorias mais frequentes")
+                for cat, count in cat_top[:10]:
+                    st.write(f"{cat}: {count} jogos")
+                st.altair_chart(plot_frequencia("🏷️ Categorias mais presentes", cat_top))
+            with col3:
+                st.subheader("🏷️ Designers mais frequentes")
+                for aut, count in aut_top[:10]:
+                    st.write(f"{aut}: {count} jogos")
+                st.altair_chart(plot_frequencia("🏷️ Designers mais presentes", aut_top))
 
     #Sugestão - Aqui que é o PUNK              
     # with st.spinner("Pensando em sugestões..."):
-    st.subheader("Sugestões de jogos semelhantes.")  
-    st.write("Em breve!")
-        
+    with tab3:
+        st.subheader("Sugestões de jogos semelhantes.")  
+        st.write("Em breve!")
