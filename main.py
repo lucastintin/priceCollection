@@ -257,13 +257,13 @@ if st.button("Buscar coleção") and username:
 
     with tab2:
         with st.spinner("Analisando a coleção..."):            
-            kol1, kol2 = st.columns(2)
+            kol1, kol2, kol3 = st.columns(3)
             with kol1:
-                st.subheader("Mais jogados:")
+                st.subheader("Mais jogado:")
                 #st.image(porJogas[-1]['image'], width=200)
                 st.write(f"{porJogas[-1]['name']} jogado {porJogas[-1]['numplays']} vezes")
 
-            with kol2: 
+            with kol3: 
                 st.subheader("Menos jogado:")
                 #st.image(porJogas[0]['image'], width=200)
                 st.write(f"{porJogas[0]['name']} jogado {porJogas[0]['numplays']} vezes")
