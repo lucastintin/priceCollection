@@ -11,81 +11,8 @@ collection = []
 todasMecanicas = []
 todasCategorias = []
 todosDesigners = []
+jogos = []
 #breveArtistas
-
-def gerar_html(jogos):
-    html = """
-    <html>
-    <head>
-        <style>
-            body {
-                font-family: Arial, sans-serif;
-                margin: 40px;
-            }
-            .jogo {
-                margin-bottom: 50px;
-                border-bottom: 2px solid #ddd;
-                padding-bottom: 30px;
-            }
-            img {
-                width: 100%;
-                max-height: 300px;
-                object-fit: cover;
-                border-radius: 8px;
-                opacity: 0.2;
-            }
-            img:hover {
-                opacity: 1.0;
-            }
-            .info {
-                display: flex;
-                justify-content: space-between;
-                margin-top: 20px;
-                
-            }
-            .col {
-                width: 48%;
-            }
-            .rating {
-                background: #f0f0f0;
-                padding: 10px;
-                border-radius: 6px;
-                margin-bottom: 10px;
-                font-size: 1.2em;
-            }
-        </style>
-    </head>
-    <body>
-    """
-
-    for jogo in jogos:
-        html += f"""
-        <div class="jogo">
-            <img src={jogo['image']} />
-            <h1>{jogo['name']}</h1>
-            <div class="info">
-                <div class="col">
-                    <p><strong>Ano Publicação:</strong> {jogo['year']}</p>
-                    <p><strong>Jogadores:</strong> {jogo['stats']['minplayers']} - {jogo['stats']['maxplayers']}</p>
-                    <p><strong>Duração:</strong> {jogo['stats']['minplaytime']} - {jogo['stats']['maxplaytime']} min.</p>
-                    <p><strong>Partidas:</strong> {jogo['numplays']}</p>
-                </div>
-                <div class="col">
-                    <div>
-                        <strong>Preço Histórico Máximo</strong>
-                    </div>
-                    <div> </div>
-                    <div> </div>
-                    <div>
-                        <strong>Preço Histórico Mínimo</strong>
-                    </div>
-                </div>
-            </div>
-        </div>
-        """
-
-    html += "</body></html>"
-    return html
 
 def plot_frequencia(titulo, contagem):
     df = pd.DataFrame(contagem[:10], columns=["Nome", "Frequência"])  # Top 10
@@ -217,6 +144,35 @@ hide_github_icon = """
 </style>
 """
 #st.markdown(hide_github_icon, unsafe_allow_html=True)
+
+style_page = """
+<style>
+    .card {
+        /* Add shadows to create the "card" effect */
+        box-shadow: 0 4px 8px 0 rgba(0,0,0,0.2);
+        transition: 0.3s;
+        border-radius: 5px;
+    }   
+
+    /* On mouse-over, add a deeper shadow */
+    .card:hover {
+        box-shadow: 0 8px 16px 0 rgba(0,0,0,0.2);
+    }
+
+    /* Add some padding inside the card container */
+    .container {
+        padding: 2px 16px;
+    }
+    img {
+      border-radius: 5px 5px 0 0;
+      opacity: 0.15;
+    }
+    img:hover {
+      border-radius: 5px 5px 0 0;
+      opacity: 1;
+    }
+    </style>
+    """
 if "catalogoCreated" not in st.session_state:
     st.session_state["catalogoCreated"] = False
 
@@ -224,7 +180,7 @@ def changeCatalogoState():
     st.session_state["catalogoCreated"] = True
 
 st.set_page_config(page_title="Vale Ouro", layout="wide")
-
+st.markdown(style_page, unsafe_allow_html=True)
 st.title("Quanto vale minha coleção de Boardgames?")
 
 username = st.text_input("Digite seu nome de usuário do BoardGameGeek")
@@ -257,6 +213,7 @@ if st.button("Buscar coleção") and username:
                     priceTotal += float(game['price'])
                     #Montando o dataFrame
                     data.append({"name": game["name"], "last_sell": game['price'], 'min_price': minPrice, 'max_price': maxPrice})
+                    jogos.append({"id": game["id"], "name": game["name"], "year": game["year"], "last_sell": game['price'], "image": game['image'], "numplays":game['numplays'], "stats": game['stats'], 'min_price': minPrice, 'max_price': maxPrice, 'prices': precos})
                 st.success(f"Coleção estimada entre (em USD$): {minPriceTotal:.2f} ~ {maxPriceTotal:.2f}")       
                 
                 df = pd.DataFrame(data)
@@ -302,20 +259,33 @@ if st.button("Buscar coleção") and username:
                 st.altair_chart(plot_frequencia("🧙 Designers mais presentes", aut_top))
     
     with tab3:
-        st.subheader("Catálogo de jogos")  
-        pagHTML = gerar_html(collection)
-        if st.session_state["catalogoCreated"]:
-            st.warning("Zé, eu vou mudar um monte de coisa ainda.")
-            st.download_button(
-                label="Baixar catálogo",
-                data=pagHTML,
-                file_name="catalogo.html",
-                mime="text/html",
-            )
-            st.divider()
-        st.html(pagHTML)
-        st.session_state["catalogoCreated"] = True 
-        st.toast("O catálogo foi gerado em HTML, para você abrir no navegador. Você pode usar o botão acima para baixar o arquivo.")
+        st.subheader("Catálogo de jogos")
+        for index, jogo in enumerate(jogos):
+            #st.write(jogo)
+            card = st.container()
+            kcol1, kcol2, kcol3 = card.columns(3)
+            card.markdown(f"<div class=card", unsafe_allow_html=True)
+            card.image(jogo['image'], width=200)
+            card.markdown(f"<div class=container", unsafe_allow_html=True)
+            card.write(f"**{jogo['name']}**")
+            card.write(f"Ano: {jogo['year']}")
+            card.write(f"Jogadores: {jogo['stats']['minplayers']} - {jogo['stats']['maxplayers']}")
+            card.write(f"Duração: {jogo['stats']['minplaytime']} - {jogo['stats']['maxplaytime']} min.")
+            card.write(f"Partidas: {jogo['numplays']}")
+            with kcol1:
+                card.write(f"Preço última venda")
+                card.write(f"${jogo['last_sell']:.2f}")
+            with kcol2:
+                card.write(f"Preço mínimo hicardórico")
+                card.write(f"${jogo['min_price']:.2f}")
+            with kcol3:
+                card.write(f"Preço máximo hicardórico")
+                card.write(f"${jogo['max_price']:.2f}")
+            card.line_chart(jogo['prices'], x='date', y='price', use_container_width=True)
+            card.markdown("</div>", unsafe_allow_html=True)
+            card.markdown("</div>", unsafe_allow_html=True)
+                
+                
 
     #Sugestão - Aqui que é o PUNK              
     # with st.spinner("Pensando em sugestões..."):
