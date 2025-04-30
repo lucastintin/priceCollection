@@ -149,7 +149,10 @@ def fetch_collection(username):
                 "minplaytime": minplaytime,
                 "maxplaytime": maxplaytime,
             }
-            games.append({"id": game_id, "name": name, "year": year, "price": price, "prices": prices, "image": image, "numplays":numplays, "stats": stats })
+            #Tentar colocar Mecanicas e Categorias atreladas ao jogo
+            mecanicas, categorias, designers = fetch_game_mechanics_and_categories(game_id)
+
+            games.append({"id": game_id, "name": name, "year": year, "price": price, "prices": prices, "image": image, "numplays":numplays, "stats": stats, mecanicas: mecanicas, categorias: categorias, designers: designers})
     return games
 
 #====== Streamlit App ======#
