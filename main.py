@@ -12,6 +12,7 @@ todasMecanicas = []
 todasCategorias = []
 todosDesigners = []
 jogos = []
+i = []
 #breveArtistas
 
 def plot_frequencia(titulo, contagem):
@@ -125,12 +126,29 @@ def fetch_collection(username):
 
             numplays = item.find("numplays").text
             image = item.find("image").text if item.find("image") is not None else None
+
+            if("playtime" not in item.find("stats").attrib):
+                playtime = "Não informado"
+            else:
+                playtime = item.find("stats").attrib["playtime"]
+            
+            if("minplaytime" not in item.find("stats").attrib):
+                minplaytime = "Não informado"
+            else:
+                minplaytime = item.find("stats").attrib["minplaytime"]
+            
+            if("maxplaytime" not in item.find("stats").attrib):
+                maxplaytime = "Não informado"
+            else:
+                maxplaytime = item.find("stats").attrib["maxplaytime"]
+            
             stats = {
-                "vendidos": item.find("stats").attrib["numowned"] if item.find("stats") is not None else 0,
-                "minplayers": item.find("stats").attrib["minplayers"] if item.find("stats") is not None else 0,
-                "maxplayers": item.find("stats").attrib["maxplayers"] if item.find("stats") is not None else 0,
-                "minplaytime": item.find("stats").attrib["minplaytime"] if item.find("stats") is not None else 0,
-                "maxplaytime": item.find("stats").attrib["maxplaytime"] if item.find("stats") is not None else 0,
+                "vendidos": item.find("stats").attrib["numowned"] if item.find("stats").attrib["numowned"] is not None else 0,
+                "minplayers": item.find("stats").attrib["minplayers"] if item.find("stats").attrib["minplayers"] is not None else 0,
+                "maxplayers": item.find("stats").attrib["maxplayers"] if item.find("stats").attrib["maxplayers"] is not None else 0,
+                "playingtime": playtime,
+                "minplaytime": minplaytime,
+                "maxplaytime": maxplaytime,
             }
             games.append({"id": game_id, "name": name, "year": year, "price": price, "prices": prices, "image": image, "numplays":numplays, "stats": stats })
     return games
@@ -270,6 +288,7 @@ if st.button("Buscar coleção") and username:
             card.write(f"**{jogo['name']}**")
             card.write(f"Ano: {jogo['year']}")
             card.write(f"Jogadores: {jogo['stats']['minplayers']} - {jogo['stats']['maxplayers']}")
+            card.write(f"Duração Média: {jogo['stats']['playingtime']} min.")
             card.write(f"Duração: {jogo['stats']['minplaytime']} - {jogo['stats']['maxplaytime']} min.")
             card.write(f"Partidas: {jogo['numplays']}")
             with kcol1:
