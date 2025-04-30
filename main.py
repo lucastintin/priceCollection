@@ -12,7 +12,6 @@ todasMecanicas = []
 todasCategorias = []
 todosDesigners = []
 jogos = []
-i = []
 #breveArtistas
 
 def plot_frequencia(titulo, contagem):
@@ -197,14 +196,14 @@ if "catalogoCreated" not in st.session_state:
 def changeCatalogoState():
     st.session_state["catalogoCreated"] = True
 
-st.set_page_config(page_title="Vale Ouro - v0.0.1", layout="wide")
+st.set_page_config(page_title="Vale Ouro - v0.0.2", layout="wide")
 st.markdown(style_page, unsafe_allow_html=True)
 st.title("Quanto vale minha coleção de Boardgames?")
 
 username = st.text_input("Digite seu nome de usuário do BoardGameGeek")
 
 if st.button("Buscar coleção") and username:
-    tab1, tab2, tab3, tab4 = st.tabs(["Valores", "Análise", "Catálogo", "Sugestões"])
+    tab1, tab2, tab3, tab4 = st.tabs(["Valores", "Análise", "Detalhamento", "Sugestões"])
     with st.spinner("Consultando coleção no BGG...Se você achar que está demorando, venda alguns jogos!"):
         collection = fetch_collection(username)
         priceTotal = 0
@@ -277,7 +276,7 @@ if st.button("Buscar coleção") and username:
                 st.altair_chart(plot_frequencia("🧙 Designers mais presentes", aut_top))
     
     with tab3:
-        st.subheader("Catálogo de jogos")
+        st.subheader("Detalhamento dos jogos da coleção.")
         for index, jogo in enumerate(jogos):
             #st.write(jogo)
             card = st.container()
@@ -295,10 +294,10 @@ if st.button("Buscar coleção") and username:
                 card.write(f"Preço última venda")
                 card.write(f"${jogo['last_sell']:.2f}")
             with kcol2:
-                card.write(f"Preço mínimo hicardórico")
+                card.write(f"Preço mínimo histórico")
                 card.write(f"${jogo['min_price']:.2f}")
             with kcol3:
-                card.write(f"Preço máximo hicardórico")
+                card.write(f"Preço máximo histórico")
                 card.write(f"${jogo['max_price']:.2f}")
             card.line_chart(jogo['prices'], x='date', y='price', use_container_width=True)
             card.markdown("</div>", unsafe_allow_html=True)
