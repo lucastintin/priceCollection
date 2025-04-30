@@ -179,7 +179,7 @@ if "catalogoCreated" not in st.session_state:
 def changeCatalogoState():
     st.session_state["catalogoCreated"] = True
 
-st.set_page_config(page_title="Vale Ouro", layout="wide")
+st.set_page_config(page_title="Vale Ouro - v0.0.1", layout="wide")
 st.markdown(style_page, unsafe_allow_html=True)
 st.title("Quanto vale minha coleção de Boardgames?")
 
