@@ -15,7 +15,9 @@ todasMecanicas = []
 todasCategorias = []
 todosDesigners = []
 todosArtistas = []
-#breveArtistas
+totalColecao = 0
+totalPlays = 0
+
 
 def extrair_ano(data_str):
     data = datetime.strptime(data_str, "%Y-%m-%d %H:%M:%S")
@@ -43,9 +45,9 @@ def contarMecanicasCategorias():
     return contagem_mec.most_common(), contagem_cat.most_common(), contagem_aut.most_common(), contagem_art.most_common()
 
 def fetch_game_details(paramGameId):
-    url = f"https://boardgamegeek.com/xmlapi2/thing?id={paramGameId}&type=boardgame&stats=1"
+    url = f"https://boardgamegeek.com/xmlapi2/thing?id={paramGameId}&stats=1"
     response = requests.get(url)
-    mec, cat, aut, art = [], [], [], []
+    mec, cat, aut, art, peso, compradores = [], [], [], [], [], []
     if response.status_code == 200:
         root = ET.fromstring(response.content)
         for link in root.findall(".//link"):
@@ -61,10 +63,13 @@ def fetch_game_details(paramGameId):
             if link.attrib["type"] =='boardgameartist':
                 art.append(link.attrib["value"])
                 todosArtistas.append(link.attrib["value"])
-        
-        return mec, cat, aut, art
+        if root.find(".//averageweight") is not None:
+            peso.append(float(root.find(".//averageweight").attrib.get("value")))
+        if root.find(".//wishing") is not None:
+            compradores.append(float(root.find(".//wishing").attrib.get("value")))
+        return mec, cat, aut, art, peso, compradores
     else:
-        return [], [], [], []
+        return [], [], [], [], [0], [0]	
 
 def fetch_price_USD(paramGameId):
     uri = f"https://boardgamegeek.com/api/market/products/pricehistory?ajax=1&condition=any&currency=USD&objectid={paramGameId}&objecttype=thing&pageid=1"
@@ -86,28 +91,6 @@ def fetch_price_USD(paramGameId):
                 date = extrair_ano(item["saledate"])
                 prices.append({"price": float(price), "date": date})
     return prices
-
-##DEPRECATED
-def fetch_lastPrice_USD(paramGameId):
-    uri = f"https://boardgamegeek.com/api/market/products/pricehistory?ajax=1&condition=any&currency=USD&objectid={paramGameId}&objecttype=thing&pageid=1"
-    response = requests.get(uri)
-
-    # Espera até a API processar (BGG tem delay)
-    while response.status_code == 202:
-        time.sleep(2)
-        response = requests.get(uri)
-
-    prices = []    
-    if response.status_code == 200:
-        root = JSON.loads(response.content)
-        if len(root["items"]) == 0:
-            prices.append({"price": 0, "date": "N/A"})
-        else:
-            for item in root["items"]:
-                price = item["price"]
-                date = item["saledate"]
-                prices.append({"price": price, "date": date})
-    return prices[0]['price']
 
 def fetch_collection(username):
     url = f"https://boardgamegeek.com/xmlapi2/collection?username={username}&own=1&stats=1 "
@@ -133,7 +116,7 @@ def fetch_collection(username):
             maxPrice = max(prices, key=lambda x: x['price'])['price']
             minPrice = min(prices, key=lambda x: x['price'])['price']
 
-            numplays = item.find("numplays").text
+            numplays = item.find("numplays").text            
             image = item.find("image").text if item.find("image") is not None else None
 
             if("playtime" not in item.find("stats").attrib):
@@ -159,13 +142,15 @@ def fetch_collection(username):
                 "minplaytime": minplaytime,
                 "maxplaytime": maxplaytime,
             }
-            #Tentar colocar Mecanicas e Categorias atreladas ao jogo
-            mecanicas, categorias, designers, artistas = fetch_game_details(game_id)           
+            mecanicas, categorias, designers, artistas, peso, compradores = fetch_game_details(game_id)           
 
-            jogos.append({"id": game_id, "name": name, "year": year, "prices": prices, "last_sell": last_sell, "minPrice": minPrice, "maxPrice": maxPrice, "image": image, "numplays":numplays, "stats": stats, "mecanicas": mecanicas, "categorias": categorias, "designers": designers, "artistas": artistas})
+            jogos.append({"id": game_id, "name": name, "year": year, "prices": prices, "last_sell": last_sell, "minPrice": minPrice, "maxPrice": maxPrice, "image": image, "numplays":numplays, "stats": stats, "mecanicas": mecanicas, "categorias": categorias, "designers": designers, "artistas": artistas, "peso": peso, "compradores": compradores})
     return jogos
 
 #====== Streamlit App ======#
+versao = "0.0.5"
+##INICIO LIXO
+#TODO: LIMPAR
 hide_github_icon = """
 <style>
     .stApp [data-testid="stToolbar"] {
@@ -203,22 +188,24 @@ style_page = """
     }
     </style>
     """
+####FIM LIXO
 if "catalogoCreated" not in st.session_state:
     st.session_state["catalogoCreated"] = False
 
 def changeCatalogoState():
     st.session_state["catalogoCreated"] = True
 
-st.set_page_config(page_title="Vale Ouro (versão 0.0.4)", layout="wide")
+st.set_page_config(page_title=f"Vale Ouro v{versao}", layout="wide")
 st.markdown(style_page, unsafe_allow_html=True)
 st.title("Quanto vale minha coleção de Boardgames?")
 
 username = st.text_input("Digite seu nome de usuário do BoardGameGeek")
 
 if st.button("Buscar coleção") and username:
-    tab1, tab2, tab3, tab4 = st.tabs(["Valores", "Análise", "Detalhamento", "Sugestões"])
+    tab1, tab2, tab3, tab4, tab5 = st.tabs(["Valores", "Catálogo", "Tops", "Detalhamento", "Sugestões"])
     with st.spinner("Consultando coleção no BGG...Se você achar que está demorando, venda alguns jogos!"):
         collection = fetch_collection(username)
+        totalColecao = len(collection)
         data  = []
         priceTotal = 0
         maxPriceTotal = 0
@@ -226,21 +213,24 @@ if st.button("Buscar coleção") and username:
         porJogas = sorted(collection, key=lambda jogo: int(jogo['numplays']))
 
     with tab1:
-       st.info(f"{len(collection)} jogos encontrados!")
+       st.info(f"{totalColecao} jogos encontrados!")
        with st.spinner("Calculando valores no mercado..."):
         if collection:
                 #st.write(collection)
                 for index, game in enumerate(collection):
                     maxPriceTotal += float(game['maxPrice'])
                     minPriceTotal += float(game['minPrice'])
-
                     #Total da Ultima venda
                     priceTotal += float(game['last_sell'])
+
+                    #Total de partidas jogadas
+                    totalPlays += int(game['numplays'])
        
                     data.append({"name": game["name"], "last_sell": game['last_sell'], 'min_price': game['minPrice'], 'max_price': game['maxPrice']})
                     #jogos.append({"id": game["id"], "name": game["name"], "year": game["year"], "last_sell": game['price'], "image": game['image'], "numplays":game['numplays'], "stats": game['stats'], 'min_price': minPrice, 'max_price': maxPrice, 'prices': precos})
                 st.success(f"Coleção estimada entre (em USD$): {minPriceTotal:.2f} ~ {maxPriceTotal:.2f}")       
-                
+                st.success(f"Total considerando últimas vendas no BGG (em USD$): {priceTotal:.2f} ")       
+
                 df = pd.DataFrame(data)
                 df.round(decimals=2)
                 df['last_sell'] = df['last_sell'].astype(float)
@@ -252,6 +242,29 @@ if st.button("Buscar coleção") and username:
             st.warning("Nenhum jogo encontrado ou usuário inválido.")
 
     with tab2:
+        st.subheader("Catálogo de jogos da coleção.")
+        #TODO: Deixar bonito
+        #fragment botão dowload do Catalodo
+
+        for index, jogo in enumerate(jogos):
+            card = st.container()
+            card.markdown(f"<div class=card", unsafe_allow_html=True)
+            card.image(jogo['image'], width=200)
+            card.markdown(f"<div class=container", unsafe_allow_html=True)
+            card.write(f"**{jogo['name']}**")
+            card.write(f"Ano: {jogo['year']}")
+            card.write(f"Jogadores: {jogo['stats']['minplayers']} - {jogo['stats']['maxplayers']}")
+            #TODO:REVISAR
+            card.write(f"Duração Média: {jogo['stats']['playingtime']} min.")
+            if jogo['stats']['minplaytime'] == jogo['stats']['maxplaytime']:
+                card.write(f"Duração: {jogo['stats']['maxplaytime']} min.")
+            else:
+                card.write(f"Duração: {jogo['stats']['minplaytime']} - {jogo['stats']['maxplaytime']} min.")
+            card.write(f"Partidas: {jogo['numplays']}.")
+            card.markdown("</div>", unsafe_allow_html=True)
+            card.markdown("</div>", unsafe_allow_html=True)
+
+    with tab3:
         with st.spinner("Analisando a coleção..."):            
             col1, col2 = st.columns(2)
             mec_top, cat_top, aut_top, art_top = contarMecanicasCategorias()
@@ -278,6 +291,8 @@ if st.button("Buscar coleção") and username:
                 for index, jogo in enumerate(porJogas[:10]):    
                     st.write(f"{jogo['name']}: {jogo['numplays']} partidas")
                 #st.write(f"{porJogas[0]['name']} jogado {porJogas[0]['numplays']} vezes")
+                #dfMaisJogados = pd.DataFrame(porJogas[:10])
+                #st.table(dfMaisJogados)
                 st.divider()
                 st.subheader("🏷️ Categorias mais frequentes")
                 for cat, count in cat_top[:10]:
@@ -289,38 +304,53 @@ if st.button("Buscar coleção") and username:
                     st.write(f"{art}: {count} jogos")
                 st.altair_chart(plot_frequencia("🎨 Artistas mais presentes", art_top))
     
-    with tab3:
+    with tab4:
         st.subheader("Detalhamento dos jogos da coleção.")
+        #TODO: Arrumar esse Frankstein
         for index, jogo in enumerate(jogos):
             #st.write(jogo)
-            card = st.container()
-            kcol1, kcol2, kcol3 = card.columns(3)
-            card.markdown(f"<div class=card", unsafe_allow_html=True)
-            card.image(jogo['image'], width=200)
-            card.markdown(f"<div class=container", unsafe_allow_html=True)
-            card.write(f"**{jogo['name']}**")
-            card.write(f"Ano: {jogo['year']}")
-            card.write(f"Jogadores: {jogo['stats']['minplayers']} - {jogo['stats']['maxplayers']}")
-            card.write(f"Duração Média: {jogo['stats']['playingtime']} min.")
-            card.write(f"Duração: {jogo['stats']['minplaytime']} - {jogo['stats']['maxplaytime']} min.")
-            card.write(f"Partidas: {jogo['numplays']}")
-            with kcol1:
-                card.write(f"Preço última venda")
-                card.write(f"${jogo['last_sell']:.2f}")
-            with kcol2:
-                card.write(f"Preço mínimo histórico")
-                card.write(f"${jogo['minPrice']:.2f}")
-            with kcol3:
-                card.write(f"Preço máximo histórico")
-                card.write(f"${jogo['maxPrice']:.2f}")
-            card.line_chart(jogo['prices'], x='date', y='price', use_container_width=True)
-            card.markdown("</div>", unsafe_allow_html=True)
-            card.markdown("</div>", unsafe_allow_html=True)
+            with st.container():
+                #Calculos
+                if jogo['numplays'] == 0:
+                    porcPartidas = 0
+                else:
+                    porcPartidas = float(jogo['numplays'])/float(totalPlays)
+                medianPeso = float()
+                #Apresentação                
+                st.write(f"**{jogo['name']}**")
+                st.write(f"Partidas: {jogo['numplays']} de {totalPlays} partidas jogadas. {porcPartidas:.2%} das partidas.")
+                ####
+                #Pensar melhor analisar os limites de cada faixa
+                #st.write(porcPartidas)
+                #match porcPartidas:
+                #    case porc if porc == 0.0 and porc <= 0.2:
+                #        st.progress(0.0, text="Pouquíssimas partidas jogadas.")
+                #        st.write("Você pode vender.")
+                #    case porc if porc > 0.2 and porc <= 0.5:
+                #        st.progress(0.3, text="Poucas partidas jogadas.")
+                #        st.write("Você pode começar a jogar!")
+                #    case porc if porc > 0.5 and porc <= 0.8:
+                #        st.progress(0.4, text="Muitas as partidas jogadas.")
+                #        st.write("Você gosta muito! Pode considerar comprar expansões ou jogos parecidos!")
+                #    case 1.0:
+                #        st.progress(1.0, text="Todas as partidas jogadas.")
+                #        st.write("Você é um expert nesse jogo! Vire expert em outros jogos também! Ou venda-os")
+                ####
+                st.write(f"Preço última venda")
+                st.write(f"${jogo['last_sell']:.2f}")
+                st.write(f"Preço mínimo histórico")
+                st.write(f"${jogo['minPrice']:.2f}")
+                st.write(f"Preço máximo histórico")
+                st.write(f"${jogo['maxPrice']:.2f}")
+                with st.expander("Historico de preços", expanded=False):
+                    st.line_chart(jogo['prices'], x='date', y='price', use_container_width=True)
                 
-                
-
     #Sugestão - Aqui que é o PUNK              
     # with st.spinner("Pensando em sugestões..."):
-    with tab4:
+    with tab5:
         st.subheader("Sugestões de jogos semelhantes.")  
-        st.write("Em breve!")
+        st.write("Em breve! Um abraço a todos os membros do LUDUS Magisterium.")
+        #TODO: Calular a media de peso da coleção
+        #Soma Peso / len(jogos) 
+        #for x in range(0, 3):
+        #    st.write(jogos[x])
