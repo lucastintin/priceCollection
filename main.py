@@ -370,5 +370,5 @@ if st.button("Buscar coleção") and username:
         st.write("Em breve! Um abraço a todos os membros do LUDUS Magisterium.")
         #TODO: Calular a media de peso da coleção
         #Soma Peso / len(jogos) 
-        for x in range(0, 3):
-            st.write(jogos[x])
+        #for x in range(0, 3):
+        #    st.write(jogos[x])
