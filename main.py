@@ -10,10 +10,11 @@ from datetime import datetime
 
 #variáveis globais
 collection = []
+jogos = []
 todasMecanicas = []
 todasCategorias = []
 todosDesigners = []
-jogos = []
+todosArtistas = []
 #breveArtistas
 
 def extrair_ano(data_str):
@@ -37,13 +38,14 @@ def contarMecanicasCategorias():
     contagem_mec = Counter(todasMecanicas)
     contagem_cat = Counter(todasCategorias)
     contagem_aut = Counter(todosDesigners)
+    contagem_art = Counter(todosArtistas)
 
-    return contagem_mec.most_common(), contagem_cat.most_common(), contagem_aut.most_common()
+    return contagem_mec.most_common(), contagem_cat.most_common(), contagem_aut.most_common(), contagem_art.most_common()
 
-def fetch_game_mechanics_and_categories(paramGameId):
+def fetch_game_details(paramGameId):
     url = f"https://boardgamegeek.com/xmlapi2/thing?id={paramGameId}&type=boardgame&stats=1"
     response = requests.get(url)
-    mec, cat, aut = [], [], []
+    mec, cat, aut, art = [], [], [], []
     if response.status_code == 200:
         root = ET.fromstring(response.content)
         for link in root.findall(".//link"):
@@ -56,10 +58,13 @@ def fetch_game_mechanics_and_categories(paramGameId):
             if link.attrib["type"] =='boardgamedesigner':
                 aut.append(link.attrib["value"])
                 todosDesigners.append(link.attrib["value"])
+            if link.attrib["type"] =='boardgameartist':
+                art.append(link.attrib["value"])
+                todosArtistas.append(link.attrib["value"])
         
-        return mec, cat, aut
+        return mec, cat, aut, art
     else:
-        return [], [], []
+        return [], [], [], []
 
 def fetch_price_USD(paramGameId):
     uri = f"https://boardgamegeek.com/api/market/products/pricehistory?ajax=1&condition=any&currency=USD&objectid={paramGameId}&objecttype=thing&pageid=1"
@@ -155,9 +160,9 @@ def fetch_collection(username):
                 "maxplaytime": maxplaytime,
             }
             #Tentar colocar Mecanicas e Categorias atreladas ao jogo
-            mecanicas, categorias, designers = fetch_game_mechanics_and_categories(game_id)           
+            mecanicas, categorias, designers, artistas = fetch_game_details(game_id)           
 
-            jogos.append({"id": game_id, "name": name, "year": year, "prices": prices, "last_sell": last_sell, "minPrice": minPrice, "maxPrice": maxPrice, "image": image, "numplays":numplays, "stats": stats, "mecanicas": mecanicas, "categorias": categorias, "designers": designers})
+            jogos.append({"id": game_id, "name": name, "year": year, "prices": prices, "last_sell": last_sell, "minPrice": minPrice, "maxPrice": maxPrice, "image": image, "numplays":numplays, "stats": stats, "mecanicas": mecanicas, "categorias": categorias, "designers": designers, "artistas": artistas})
     return jogos
 
 #====== Streamlit App ======#
@@ -204,7 +209,7 @@ if "catalogoCreated" not in st.session_state:
 def changeCatalogoState():
     st.session_state["catalogoCreated"] = True
 
-st.set_page_config(page_title="Vale Ouro (versão 0.0.3)", layout="wide")
+st.set_page_config(page_title="Vale Ouro (versão 0.0.4)", layout="wide")
 st.markdown(style_page, unsafe_allow_html=True)
 st.title("Quanto vale minha coleção de Boardgames?")
 
@@ -248,39 +253,41 @@ if st.button("Buscar coleção") and username:
 
     with tab2:
         with st.spinner("Analisando a coleção..."):            
-            kol1, kol2, kol3 = st.columns(3)
-            with kol1:
-                st.subheader("⬆️ Mais jogado:")
+            col1, col2 = st.columns(2)
+            mec_top, cat_top, aut_top, art_top = contarMecanicasCategorias()
+            with col1:
+                st.subheader("⬆️ Mais jogados:")
                 #st.image(porJogas[-1]['image'], width=200)
                 for index, jogo in enumerate(reversed(porJogas[-10:])):
                     st.write(f"{jogo['name']}: {jogo['numplays']} partidas")
                 #st.write(f"{porJogas[-1]['name']} jogado {porJogas[-1]['numplays']} vezes")
-
-            with kol3: 
-                st.subheader("⬇️ Menos jogado:")
-                #st.image(porJogas[0]['image'], width=200)
-                for index, jogo in enumerate(porJogas[:10]):    
-                    st.write(f"{jogo['name']}: {jogo['numplays']} partidas")
-                #st.write(f"{porJogas[0]['name']} jogado {porJogas[0]['numplays']} vezes")
-            st.divider()
-
-            col1, col2, col3 = st.columns(3)
-            mec_top, cat_top, aut_top = contarMecanicasCategorias()
-            with col1:  
+                st.divider()
                 st.subheader("🧩 Mecânicas mais frequentes")
                 for mec, count in mec_top[:10]:
                     st.write(f"{mec}: {count} jogos")
                 st.altair_chart(plot_frequencia("🧩 Mecânicas mais presentes", mec_top))
-            with col2:
-                st.subheader("🏷️ Categorias mais frequentes")
-                for cat, count in cat_top[:10]:
-                    st.write(f"{cat}: {count} jogos")
-                st.altair_chart(plot_frequencia("🏷️ Categorias mais presentes", cat_top))
-            with col3:
+                st.divider()
                 st.subheader("🧙 Designers mais frequentes")
                 for aut, count in aut_top[:10]:
                     st.write(f"{aut}: {count} jogos")
                 st.altair_chart(plot_frequencia("🧙 Designers mais presentes", aut_top))
+
+            with col2: 
+                st.subheader("⬇️ Menos jogados:")
+                #st.image(porJogas[0]['image'], width=200)
+                for index, jogo in enumerate(porJogas[:10]):    
+                    st.write(f"{jogo['name']}: {jogo['numplays']} partidas")
+                #st.write(f"{porJogas[0]['name']} jogado {porJogas[0]['numplays']} vezes")
+                st.divider()
+                st.subheader("🏷️ Categorias mais frequentes")
+                for cat, count in cat_top[:10]:
+                    st.write(f"{cat}: {count} jogos")
+                st.altair_chart(plot_frequencia("🏷️ Categorias mais presentes", cat_top))
+                st.divider()
+                st.subheader("🎨 Artistas mais frequentes")
+                for art, count in art_top[:10]:
+                    st.write(f"{art}: {count} jogos")
+                st.altair_chart(plot_frequencia("🎨 Artistas mais presentes", art_top))
     
     with tab3:
         st.subheader("Detalhamento dos jogos da coleção.")
