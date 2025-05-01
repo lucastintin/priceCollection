@@ -6,13 +6,19 @@ import time
 import json as JSON
 from collections import Counter
 import altair as alt
+from datetime import datetime
 
+#variáveis globais
 collection = []
 todasMecanicas = []
 todasCategorias = []
 todosDesigners = []
 jogos = []
 #breveArtistas
+
+def extrair_ano(data_str):
+    data = datetime.strptime(data_str, "%Y-%m-%d %H:%M:%S")
+    return data.year
 
 def plot_frequencia(titulo, contagem):
     df = pd.DataFrame(contagem[:10], columns=["Nome", "Frequência"])  # Top 10
@@ -27,15 +33,7 @@ def plot_frequencia(titulo, contagem):
     )
     return chart
 
-def contarMecanicasCategorias(jogos_ids):
-    
-    for game_id in jogos_ids:
-        info = fetch_game_mechanics_and_categories(game_id["id"])
-        #print(info)
-        #todas_mecanicas.extend(info["mechanics"])
-        #todas_categorias.extend(info["categories"])
-        time.sleep(1)  # evitar overload na API
-
+def contarMecanicasCategorias():
     contagem_mec = Counter(todasMecanicas)
     contagem_cat = Counter(todasCategorias)
     contagem_aut = Counter(todosDesigners)
@@ -45,18 +43,21 @@ def contarMecanicasCategorias(jogos_ids):
 def fetch_game_mechanics_and_categories(paramGameId):
     url = f"https://boardgamegeek.com/xmlapi2/thing?id={paramGameId}&type=boardgame&stats=1"
     response = requests.get(url)
-    
+    mec, cat, aut = [], [], []
     if response.status_code == 200:
         root = ET.fromstring(response.content)
         for link in root.findall(".//link"):
             if link.attrib["type"] == "boardgamecategory":
+               mec.append(link.attrib["value"])
                todasCategorias.append(link.attrib["value"]) 
             if link.attrib["type"] =='boardgamemechanic':
+                cat.append(link.attrib["value"])
                 todasMecanicas.append(link.attrib["value"])
             if link.attrib["type"] =='boardgamedesigner':
+                aut.append(link.attrib["value"])
                 todosDesigners.append(link.attrib["value"])
         
-        return todasMecanicas, todasCategorias, todosDesigners
+        return mec, cat, aut
     else:
         return [], [], []
 
@@ -77,7 +78,7 @@ def fetch_price_USD(paramGameId):
         else:
             for item in root["items"]:
                 price = item["price"]
-                date = item["saledate"]
+                date = extrair_ano(item["saledate"])
                 prices.append({"price": float(price), "date": date})
     return prices
 
@@ -112,7 +113,8 @@ def fetch_collection(username):
         time.sleep(30)
         response = requests.get(url)
 
-    games = []
+    minPrice = 0
+    maxPrice = 0
     if response.status_code == 200:
         root = ET.fromstring(response.content)
         for item in root.findall("item"):
@@ -120,8 +122,11 @@ def fetch_collection(username):
             name = item.find("name").text
             year_elem = item.find("yearpublished")
             year = year_elem.text if year_elem is not None else "?"
+
             prices = fetch_price_USD(game_id)
-            price = prices[0]['price']
+            last_sell = prices[0]['price']
+            maxPrice = max(prices, key=lambda x: x['price'])['price']
+            minPrice = min(prices, key=lambda x: x['price'])['price']
 
             numplays = item.find("numplays").text
             image = item.find("image").text if item.find("image") is not None else None
@@ -150,10 +155,10 @@ def fetch_collection(username):
                 "maxplaytime": maxplaytime,
             }
             #Tentar colocar Mecanicas e Categorias atreladas ao jogo
-            mecanicas, categorias, designers = fetch_game_mechanics_and_categories(game_id)
+            mecanicas, categorias, designers = fetch_game_mechanics_and_categories(game_id)           
 
-            games.append({"id": game_id, "name": name, "year": year, "price": price, "prices": prices, "image": image, "numplays":numplays, "stats": stats, mecanicas: mecanicas, categorias: categorias, designers: designers})
-    return games
+            jogos.append({"id": game_id, "name": name, "year": year, "prices": prices, "last_sell": last_sell, "minPrice": minPrice, "maxPrice": maxPrice, "image": image, "numplays":numplays, "stats": stats, "mecanicas": mecanicas, "categorias": categorias, "designers": designers})
+    return jogos
 
 #====== Streamlit App ======#
 hide_github_icon = """
@@ -199,7 +204,7 @@ if "catalogoCreated" not in st.session_state:
 def changeCatalogoState():
     st.session_state["catalogoCreated"] = True
 
-st.set_page_config(page_title="Vale Ouro - v0.0.2", layout="wide")
+st.set_page_config(page_title="Vale Ouro (versão 0.0.3)", layout="wide")
 st.markdown(style_page, unsafe_allow_html=True)
 st.title("Quanto vale minha coleção de Boardgames?")
 
@@ -209,10 +214,10 @@ if st.button("Buscar coleção") and username:
     tab1, tab2, tab3, tab4 = st.tabs(["Valores", "Análise", "Detalhamento", "Sugestões"])
     with st.spinner("Consultando coleção no BGG...Se você achar que está demorando, venda alguns jogos!"):
         collection = fetch_collection(username)
+        data  = []
         priceTotal = 0
         maxPriceTotal = 0
         minPriceTotal = 0
-        data  = []
         porJogas = sorted(collection, key=lambda jogo: int(jogo['numplays']))
 
     with tab1:
@@ -221,19 +226,14 @@ if st.button("Buscar coleção") and username:
         if collection:
                 #st.write(collection)
                 for index, game in enumerate(collection):
+                    maxPriceTotal += float(game['maxPrice'])
+                    minPriceTotal += float(game['minPrice'])
 
-                    precos = fetch_price_USD(game["id"])
-                    
-                    maxPrice = max(precos, key=lambda x: x['price'])['price']
-                    minPrice = min(precos, key=lambda x: x['price'])['price']
-
-                    maxPriceTotal += float(maxPrice)
-                    minPriceTotal += float(minPrice)
-
-                    priceTotal += float(game['price'])
-                    #Montando o dataFrame
-                    data.append({"name": game["name"], "last_sell": game['price'], 'min_price': minPrice, 'max_price': maxPrice})
-                    jogos.append({"id": game["id"], "name": game["name"], "year": game["year"], "last_sell": game['price'], "image": game['image'], "numplays":game['numplays'], "stats": game['stats'], 'min_price': minPrice, 'max_price': maxPrice, 'prices': precos})
+                    #Total da Ultima venda
+                    priceTotal += float(game['last_sell'])
+       
+                    data.append({"name": game["name"], "last_sell": game['last_sell'], 'min_price': game['minPrice'], 'max_price': game['maxPrice']})
+                    #jogos.append({"id": game["id"], "name": game["name"], "year": game["year"], "last_sell": game['price'], "image": game['image'], "numplays":game['numplays'], "stats": game['stats'], 'min_price': minPrice, 'max_price': maxPrice, 'prices': precos})
                 st.success(f"Coleção estimada entre (em USD$): {minPriceTotal:.2f} ~ {maxPriceTotal:.2f}")       
                 
                 df = pd.DataFrame(data)
@@ -252,16 +252,20 @@ if st.button("Buscar coleção") and username:
             with kol1:
                 st.subheader("⬆️ Mais jogado:")
                 #st.image(porJogas[-1]['image'], width=200)
-                st.write(f"{porJogas[-1]['name']} jogado {porJogas[-1]['numplays']} vezes")
+                for index, jogo in enumerate(reversed(porJogas[-10:])):
+                    st.write(f"{jogo['name']}: {jogo['numplays']} partidas")
+                #st.write(f"{porJogas[-1]['name']} jogado {porJogas[-1]['numplays']} vezes")
 
             with kol3: 
                 st.subheader("⬇️ Menos jogado:")
                 #st.image(porJogas[0]['image'], width=200)
-                st.write(f"{porJogas[0]['name']} jogado {porJogas[0]['numplays']} vezes")
+                for index, jogo in enumerate(porJogas[:10]):    
+                    st.write(f"{jogo['name']}: {jogo['numplays']} partidas")
+                #st.write(f"{porJogas[0]['name']} jogado {porJogas[0]['numplays']} vezes")
             st.divider()
 
             col1, col2, col3 = st.columns(3)
-            mec_top, cat_top, aut_top = contarMecanicasCategorias(collection)
+            mec_top, cat_top, aut_top = contarMecanicasCategorias()
             with col1:  
                 st.subheader("🧩 Mecânicas mais frequentes")
                 for mec, count in mec_top[:10]:
@@ -298,10 +302,10 @@ if st.button("Buscar coleção") and username:
                 card.write(f"${jogo['last_sell']:.2f}")
             with kcol2:
                 card.write(f"Preço mínimo histórico")
-                card.write(f"${jogo['min_price']:.2f}")
+                card.write(f"${jogo['minPrice']:.2f}")
             with kcol3:
                 card.write(f"Preço máximo histórico")
-                card.write(f"${jogo['max_price']:.2f}")
+                card.write(f"${jogo['maxPrice']:.2f}")
             card.line_chart(jogo['prices'], x='date', y='price', use_container_width=True)
             card.markdown("</div>", unsafe_allow_html=True)
             card.markdown("</div>", unsafe_allow_html=True)
