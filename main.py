@@ -148,7 +148,7 @@ def fetch_collection(username):
     return jogos
 
 #====== Streamlit App ======#
-versao = "0.0.5"
+versao = "0.0.6"
 ##INICIO LIXO
 #TODO: LIMPAR
 hide_github_icon = """
