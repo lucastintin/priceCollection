@@ -148,7 +148,7 @@ def fetch_collection(username):
     return jogos
 
 #====== Streamlit App ======#
-versao = "0.0.7"
+versao = "0.0.8"
 ##INICIO LIXO
 #TODO: LIMPAR
 hide_github_icon = """
@@ -315,7 +315,7 @@ if st.button("Buscar coleção") and username:
             with st.container():
                 ###Calculos
                 #Partidas
-                if jogo['numplays'] == 0:
+                if totalPlays == 0:
                     porcPartidas = 0
                 else:
                     porcPartidas = float(jogo['numplays'])/float(totalPlays)
