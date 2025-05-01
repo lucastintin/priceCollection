@@ -17,7 +17,7 @@ todosDesigners = []
 todosArtistas = []
 totalColecao = 0
 totalPlays = 0
-
+totalPeso = 0
 
 def extrair_ano(data_str):
     data = datetime.strptime(data_str, "%Y-%m-%d %H:%M:%S")
@@ -148,7 +148,7 @@ def fetch_collection(username):
     return jogos
 
 #====== Streamlit App ======#
-versao = "0.0.6"
+versao = "0.0.7"
 ##INICIO LIXO
 #TODO: LIMPAR
 hide_github_icon = """
@@ -225,6 +225,9 @@ if st.button("Buscar coleção") and username:
 
                     #Total de partidas jogadas
                     totalPlays += int(game['numplays'])
+
+                    #Peso total da coleção
+                    totalPeso += float(game['peso'][0]) if game['peso'] else 0
        
                     data.append({"name": game["name"], "last_sell": game['last_sell'], 'min_price': game['minPrice'], 'max_price': game['maxPrice']})
                     #jogos.append({"id": game["id"], "name": game["name"], "year": game["year"], "last_sell": game['price'], "image": game['image'], "numplays":game['numplays'], "stats": game['stats'], 'min_price': minPrice, 'max_price': maxPrice, 'prices': precos})
@@ -234,15 +237,15 @@ if st.button("Buscar coleção") and username:
                 df = pd.DataFrame(data)
                 df.round(decimals=2)
                 df['last_sell'] = df['last_sell'].astype(float)
-                with st.expander("Ver Detalhes de valores da coleção"):
+                with st.expander("Ver listagem de valores da coleção"):
                     st.write("A coleção foi estimada com base no preço da última venda realizada no BGG Market, independente da condição do jogo.")
                     st.dataframe(df, use_container_width=True, hide_index=True)
-                st.toast("No detalhamento da coleção, há opção de Exportar para CSV. Pode ser importado no Excel, para você usar mais funções.", icon="🔔")
+                #st.toast("No detalhamento da coleção, há opção de Exportar para CSV. Pode ser importado no Excel, para você usar mais funções.", icon="🔔")
         else:
             st.warning("Nenhum jogo encontrado ou usuário inválido.")
 
     with tab2:
-        st.subheader("Catálogo de jogos da coleção.")
+        #st.subheader("Catálogo de jogos da coleção.")
         #TODO: Deixar bonito
         #fragment botão dowload do Catalodo
 
@@ -305,20 +308,32 @@ if st.button("Buscar coleção") and username:
                 st.altair_chart(plot_frequencia("🎨 Artistas mais presentes", art_top))
     
     with tab4:
-        st.subheader("Detalhamento dos jogos da coleção.")
+        #st.subheader("Detalhamento dos jogos da coleção.")
         #TODO: Arrumar esse Frankstein
         for index, jogo in enumerate(jogos):
             #st.write(jogo)
             with st.container():
-                #Calculos
+                ###Calculos
+                #Partidas
                 if jogo['numplays'] == 0:
                     porcPartidas = 0
                 else:
                     porcPartidas = float(jogo['numplays'])/float(totalPlays)
-                medianPeso = float()
+
+                #Peso
+                medianPeso = float(totalPeso)/float(totalColecao)
+                diffPeso = float(jogo['peso'][0]) - medianPeso	
+                if diffPeso < 0:
+                    pesoStr = "Esse jogo é mais leve que a média da coleção."
+                elif diffPeso > 0:
+                    pesoStr = "Esse jogo é mais pesado que a média da coleção."
+                else:
+                    pesoStr = "Esse jogo está na média da coleção."
+
                 #Apresentação                
-                st.write(f"**{jogo['name']}**")
+                st.header(f"**{jogo['name']}**")
                 st.write(f"Partidas: {jogo['numplays']} de {totalPlays} partidas jogadas. {porcPartidas:.2%} das partidas.")
+                st.write(f"Peso: {jogo['peso'][0]:.2F}/5. Média: {medianPeso:.2F}. {pesoStr}")
                 ####
                 #Pensar melhor analisar os limites de cada faixa
                 #st.write(porcPartidas)
@@ -336,21 +351,23 @@ if st.button("Buscar coleção") and username:
                 #        st.progress(1.0, text="Todas as partidas jogadas.")
                 #        st.write("Você é um expert nesse jogo! Vire expert em outros jogos também! Ou venda-os")
                 ####
-                st.write(f"Preço última venda")
-                st.write(f"${jogo['last_sell']:.2f}")
-                st.write(f"Preço mínimo histórico")
-                st.write(f"${jogo['minPrice']:.2f}")
-                st.write(f"Preço máximo histórico")
-                st.write(f"${jogo['maxPrice']:.2f}")
-                with st.expander("Historico de preços", expanded=False):
+                st.dataframe(
+                    pd.DataFrame({
+                        "Preço última venda": [jogo['last_sell']],
+                        "Preço mínimo histórico": [jogo['minPrice']],
+                        "Preço máximo histórico": [jogo['maxPrice']],
+                    }), hide_index=True
+                )	
+                
+                with st.expander(f"Historico de preço do {jogo['name']} ", expanded=False):
                     st.line_chart(jogo['prices'], x='date', y='price', use_container_width=True)
                 
     #Sugestão - Aqui que é o PUNK              
     # with st.spinner("Pensando em sugestões..."):
     with tab5:
-        st.subheader("Sugestões de jogos semelhantes.")  
+        #st.subheader("Sugestões de jogos semelhantes.")  
         st.write("Em breve! Um abraço a todos os membros do LUDUS Magisterium.")
         #TODO: Calular a media de peso da coleção
         #Soma Peso / len(jogos) 
-        #for x in range(0, 3):
-        #    st.write(jogos[x])
+        for x in range(0, 3):
+            st.write(jogos[x])
