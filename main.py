@@ -361,6 +361,7 @@ if st.button("Buscar coleção") and username:
                 
                 with st.expander(f"Historico de preço do {jogo['name']} ", expanded=False):
                     st.line_chart(jogo['prices'], x='date', y='price', use_container_width=True)
+                st.divider()
                 
     #Sugestão - Aqui que é o PUNK              
     # with st.spinner("Pensando em sugestões..."):
