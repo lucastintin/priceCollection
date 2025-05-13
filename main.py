@@ -7,6 +7,7 @@ import json as JSON
 from collections import Counter
 import altair as alt
 from datetime import datetime
+import pathlib
 
 #variáveis globais
 collection = []
@@ -88,7 +89,7 @@ def fetch_price_USD(paramGameId):
         else:
             for item in root["items"]:
                 price = item["price"]
-                date = extrair_ano(item["saledate"])
+                date = item["saledate"]
                 prices.append({"price": float(price), "date": date})
     return prices
 
@@ -148,56 +149,22 @@ def fetch_collection(username):
     return jogos
 
 #====== Streamlit App ======#
-versao = "0.0.8"
-##INICIO LIXO
-#TODO: LIMPAR
-hide_github_icon = """
-<style>
-    .stApp [data-testid="stToolbar"] {
-        display: none;
-    }
-</style>
-"""
-#st.markdown(hide_github_icon, unsafe_allow_html=True)
+versao = "0.0.9"
 
-style_page = """
-<style>
-    .card {
-        /* Add shadows to create the "card" effect */
-        box-shadow: 0 4px 8px 0 rgba(0,0,0,0.2);
-        transition: 0.3s;
-        border-radius: 5px;
-    }   
+st.set_page_config(page_title=f"Vale Ouro v{versao}", layout="wide")
+st.title("Quanto vale minha coleção de Boardgames?")
 
-    /* On mouse-over, add a deeper shadow */
-    .card:hover {
-        box-shadow: 0 8px 16px 0 rgba(0,0,0,0.2);
-    }
+def load_css(file_path):
+    with open(file_path) as f:
+        st.html(f"<style>{f.read()}</style>")
+cssPath = pathlib.Path("main.css")
+load_css(cssPath)
 
-    /* Add some padding inside the card container */
-    .container {
-        padding: 2px 16px;
-    }
-    img {
-      border-radius: 5px 5px 0 0;
-      opacity: 0.15;
-    }
-    img:hover {
-      border-radius: 5px 5px 0 0;
-      opacity: 1;
-    }
-    </style>
-    """
-####FIM LIXO
 if "catalogoCreated" not in st.session_state:
     st.session_state["catalogoCreated"] = False
 
 def changeCatalogoState():
     st.session_state["catalogoCreated"] = True
-
-st.set_page_config(page_title=f"Vale Ouro v{versao}", layout="wide")
-st.markdown(style_page, unsafe_allow_html=True)
-st.title("Quanto vale minha coleção de Boardgames?")
 
 username = st.text_input("Digite seu nome de usuário do BoardGameGeek")
 
@@ -263,7 +230,7 @@ if st.button("Buscar coleção") and username:
                 card.write(f"Duração: {jogo['stats']['maxplaytime']} min.")
             else:
                 card.write(f"Duração: {jogo['stats']['minplaytime']} - {jogo['stats']['maxplaytime']} min.")
-            card.write(f"Partidas: {jogo['numplays']}.")
+            #card.write(f"Partidas: {jogo['numplays']}.")
             card.markdown("</div>", unsafe_allow_html=True)
             card.markdown("</div>", unsafe_allow_html=True)
 
@@ -333,24 +300,24 @@ if st.button("Buscar coleção") and username:
                 #Apresentação                
                 st.header(f"**{jogo['name']}**")
                 st.write(f"Partidas: {jogo['numplays']} de {totalPlays} partidas jogadas. {porcPartidas:.2%} das partidas.")
-                st.write(f"Peso: {jogo['peso'][0]:.2F}/5. Média: {medianPeso:.2F}. {pesoStr}")
                 ####
                 #Pensar melhor analisar os limites de cada faixa
                 #st.write(porcPartidas)
-                #match porcPartidas:
-                #    case porc if porc == 0.0 and porc <= 0.2:
-                #        st.progress(0.0, text="Pouquíssimas partidas jogadas.")
-                #        st.write("Você pode vender.")
-                #    case porc if porc > 0.2 and porc <= 0.5:
-                #        st.progress(0.3, text="Poucas partidas jogadas.")
-                #        st.write("Você pode começar a jogar!")
-                #    case porc if porc > 0.5 and porc <= 0.8:
-                #        st.progress(0.4, text="Muitas as partidas jogadas.")
-                #        st.write("Você gosta muito! Pode considerar comprar expansões ou jogos parecidos!")
-                #    case 1.0:
-                #        st.progress(1.0, text="Todas as partidas jogadas.")
-                #        st.write("Você é um expert nesse jogo! Vire expert em outros jogos também! Ou venda-os")
+                match porcPartidas:
+                    case porcPartidas if 0.00 < porcPartidas <= 0.20:
+                        st.progress(0.0, text="Pouquíssimas partidas jogadas.")
+                        st.write("Você pode vender.")
+                    case porcPartidas if 0.20 < porcPartidas <= 0.50:
+                        st.progress(0.3, text="Poucas partidas jogadas.")
+                        st.write("Você pode começar a jogar!")
+                    case porcPartidas if 0.50 < porcPartidas <= 0.80:
+                        st.progress(0.6, text="Muitas as partidas jogadas.")
+                        st.write("Você gosta muito! Pode considerar comprar expansões ou jogos parecidos!")
+                    case porcPartidas if 0.80 < porcPartidas:
+                        st.progress(0.90, text="Todas as partidas jogadas.")
+                        st.write("Você é um expert nesse jogo! Vire expert em outros jogos também! Ou venda-os")
                 ####
+                st.write(f"Peso: {jogo['peso'][0]:.2F}/5. Média: {medianPeso:.2F}. {pesoStr}")
                 st.dataframe(
                     pd.DataFrame({
                         "Preço última venda": [jogo['last_sell']],
